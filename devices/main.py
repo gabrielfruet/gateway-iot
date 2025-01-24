@@ -1,5 +1,11 @@
 import pika
 import proto.messages_pb2 as messages
+import proto.services_pb2 as services
+import proto.services_pb2_grpc as services_grpc
+import actuator
+from concurrent import futures
+from threading import Thread, Lock
+import grpc
 import sys
 import time
 import logging
@@ -8,11 +14,12 @@ import signal
 
 logger = logging.getLogger(__name__)
 syslog = logging.StreamHandler()
-formatter = logging.Formatter(f'%(asctime)s %(app_name)s : %(message)s')
+formatter = logging.Formatter('%(levelname)s %(asctime)s %(app_name)s: %(message)s')
 syslog.setFormatter(formatter)
+logger.setLevel(logging.INFO)
+logger.handlers.clear()
 logger.addHandler(syslog)
 
-logging.basicConfig(level=logging.INFO)
 
 def connect_to_broker() -> pika.BlockingConnection:
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
@@ -24,10 +31,12 @@ class Device():
         self.id: str | None = None
         self.name = name
         self.data: int = data
+        self.data_lock: Lock = Lock()
 
     def start(self):
         self._connect_to_gateway()
-        self.send_to_gateway()
+        t = Thread(target=self.send_to_gateway)
+        t.run()
 
     def _connect_to_gateway(self):
         channel = self.connection.channel()
@@ -55,6 +64,7 @@ class Device():
         try:
             while True:
                 sdu = messages.SensorDataUpdate(data=str(self.data),id=self.id)
+                self.data_lock.acquire()
                 logger.info("Sending data to gateway")
                 logger.info(f"Data: {sdu.data}")
                 logger.info(f"ID: {sdu.id}")
@@ -62,6 +72,7 @@ class Device():
                 channel.basic_publish(exchange='',
                                       routing_key=queue_name,
                                       body=sdu.SerializeToString())
+                self.data_lock.release()
 
                 time.sleep(5)
 
@@ -69,6 +80,18 @@ class Device():
             logger.warning(err)
         finally:
             channel.close()
+
+    def change_data(self, request: services.ActuatorState) -> int | None:
+        if request.id != self.id:
+            logger.warning("ID does not match")
+            return None
+
+        self.data_lock.acquire()
+        self.data = int(request.state)
+        self.data_lock.release()
+
+        return self.data
+
 
     def disconnect(self):
         channel = self.connection.channel()
@@ -108,13 +131,17 @@ if __name__ == '__main__':
 
     logger = logging.LoggerAdapter(logger, {"app_name":queue_name})
 
-
     device = Device(queue_name, 10)
 
     atexit.register(device.disconnect)
 
     try:
         device.start()
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        server.add_insecure_port("[::]:50051")
+        services_grpc.add_ActuatorServicer_to_server(actuator.ActuatorServer(device), server)
+        server.start()
+        server.wait_for_termination()
     except Exception:
         pass
     finally:

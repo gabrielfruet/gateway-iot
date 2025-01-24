@@ -23,7 +23,8 @@ $(GO_DST)/proto: $(PROTO_FILES)
 		--go-grpc_opt=paths=source_relative --go-grpc_out=$(GO_DST) $(PROTO_FILES)
 
 $(PY_DST)/proto: $(PROTO_FILES)
-	protoc -I=. --python_out=$(PY_DST) --pyi_out=$(PY_DST) $(PROTO_FILES)
+	# protoc -I=. --python_out=$(PY_DST) --pyi_out=$(PY_DST) --grpc_python_out=$(PY_DST) $(PROTO_FILES)
+	python -m grpc_tools.protoc -I=. --python_out=$(PY_DST) --pyi_out=$(PY_DST)  --grpc_python_out=$(PY_DST) $(PROTO_FILES)
 
 .PHONY:rabbitmq
 rabbitmq: 

@@ -1,2 +1,4 @@
 pika
 protobuf
+grpcio-tools
+grpcio
