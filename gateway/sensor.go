@@ -15,20 +15,58 @@ const DEVICE_TYPE_SENSOR = pb.DeviceType_DEVICE_TYPE_SENSOR
 const DEVICE_TYPE_ACTUATOR = pb.DeviceType_DEVICE_TYPE_ACTUATOR
 
 type Sensor struct {
-	delivery    <-chan amqp.Delivery
+    channel     *amqp.Channel
 	id          uuid.UUID
     name        string
 	data        string
     disconnect  chan struct{}
 }
 
-func (s *Sensor) ListenUpdates() {
+func (s *Sensor) GetQueueDelivery() (<-chan amqp.Delivery, error) {
+	_, err := s.channel.QueueDeclare(
+		s.name, // name
+		false,            // durable
+		false,            // delete when unused
+		false,             // exclusive
+		false,            // no-wait
+		nil,              // arguments
+	)
+
+
+	if err != nil {
+		return nil, err
+	}
+
+	delivery, err := s.channel.Consume(
+		s.name, // queue
+		"",               // consumer
+		true,             // auto-ack
+		false,             // exclusive
+		false,            // no-local
+		false,            // no-wait
+		nil,              // args
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+    return delivery, nil
+}
+
+func (s *Sensor) ListenUpdates() error {
+    delivery, err := s.GetQueueDelivery()
+
+    if err != nil {
+        return err
+    }
+
 	for {
 		select {
-		case msg, ok := <-s.delivery:
+		case msg, ok := <-delivery:
 			if !ok {
 				log.Printf("Delivery channel closed for %s\n", s.name)
-				return
+				return nil
 			}
 
 			sensor_data := pb.SensorDataUpdate{}
@@ -46,40 +84,12 @@ func (s *Sensor) ListenUpdates() {
 
 		case <-s.disconnect:
 			slog.Info(fmt.Sprintf("Stopping %s from receiving updates\n", s.name))
-			return
+			return nil
 		}
 	}
 }
 
 func sensorFromConnection(ch *amqp.Channel, sensor *pb.ConnectionRequest) (*Sensor, error) {
-	_, err := ch.QueueDeclare(
-		sensor.GetQueueName(), // name
-		false,            // durable
-		false,            // delete when unused
-		false,             // exclusive
-		false,            // no-wait
-		nil,              // arguments
-	)
-
-
-	if err != nil {
-		return nil, err
-	}
-
-	delivery, err := ch.Consume(
-		sensor.GetQueueName(), // queue
-		"",               // consumer
-		true,             // auto-ack
-		false,             // exclusive
-		false,            // no-local
-		false,            // no-wait
-		nil,              // args
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
     id := uuid.New()
 
     idURN := id.URN()
@@ -100,7 +110,7 @@ func sensorFromConnection(ch *amqp.Channel, sensor *pb.ConnectionRequest) (*Sens
     })
 
 	return &Sensor{
-		delivery:    delivery,
+        channel:     ch,
 		id:          id,
         name:        sensor.GetQueueName(),
 		data:        "",
