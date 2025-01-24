@@ -1,0 +1,30 @@
+syntax = "proto2";
+package tutorial;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "gateway/proto";
+
+enum DeviceType {
+    DEVICE_TYPE_ACTUATOR = 0;
+    DEVICE_TYPE_SENSOR = 1;
+}
+
+message ConnectionRequest {
+    optional string queue_name = 1;
+    optional DeviceType type = 2;
+}
+
+message ConnectionResponse {
+    optional string id = 1;
+}
+
+message DisconnectionRequest {
+    optional string queue_name = 1;
+    optional string id = 2;
+}
+
+message SensorDataUpdate {
+    optional string data = 1;
+    optional string id = 2;
+}

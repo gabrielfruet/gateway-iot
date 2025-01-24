@@ -1,0 +1,16 @@
+syntax = "proto2";
+package tutorial;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "gateway/proto";
+
+service Actuator{
+    rpc ChangeState(ActuatorState) returns (ActuatorState) {}
+}
+
+message ActuatorState {
+    optional string id = 1;
+    optional string state = 2;
+}
+

@@ -146,7 +146,7 @@ func (g *Gateway) ListenConnections() error {
         }
 
 
-		device, err := deviceFromConnection(g.ch, connectionRequest)
+		device, err := sensorFromConnection(g.ch, connectionRequest)
 
         if err != nil {
             slog.Error(fmt.Sprintf("Error when creating device from connection: %v", err))

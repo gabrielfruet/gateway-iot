@@ -51,7 +51,7 @@ func (s *Sensor) ListenUpdates() {
 	}
 }
 
-func deviceFromConnection(ch *amqp.Channel, sensor *pb.ConnectionRequest) (*Sensor, error) {
+func sensorFromConnection(ch *amqp.Channel, sensor *pb.ConnectionRequest) (*Sensor, error) {
 	_, err := ch.QueueDeclare(
 		sensor.GetQueueName(), // name
 		false,            // durable
