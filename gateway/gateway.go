@@ -17,31 +17,40 @@ type Gateway struct {
     sensors    map[string]*Sensor
     actuators  map[string]*Actuator
     idType    map[uuid.UUID]DeviceType
-    ch         *amqp.Channel
+    conn         *amqp.Connection
     sensorLock sync.RWMutex
     actuatorLock sync.RWMutex
     idLock sync.RWMutex
+    close chan struct{}
 }
 
-func newGateway() (*Gateway, error) {
+func getConnection() (*amqp.Connection, error) {
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 
 	if err != nil {
 		return nil, err
 	}
+    return conn, nil
+}
 
-	ch, err := conn.Channel()
+func newGateway() (*Gateway, error) {
+    conn, err := getConnection()
 
-	if err != nil {
-		return nil, err
-	}
+    if err != nil {
+        return nil, err
+    }
 
 	return &Gateway{
         sensors: make(map[string]*Sensor),
         actuators: make(map[string]*Actuator),
         idType : make(map[uuid.UUID]DeviceType),
-        ch:      ch,
+        conn:      conn,
 	}, nil
+}
+
+func (g *Gateway) Close() {
+    g.close <- struct {} {}
+    g.conn.Close()
 }
 
 func (g *Gateway) GetActuators() []string {
@@ -50,6 +59,29 @@ func (g *Gateway) GetActuators() []string {
 
 func (g *Gateway) GetSensors() []string {
     return getMapKeys(g.sensors)
+}
+
+func (g *Gateway) GetSensorData(name string) (string, error) {
+    g.sensorLock.RLock()
+    defer g.sensorLock.RUnlock()
+    if sensor, ok := g.sensors[name]; ok {
+        return sensor.data, nil
+    }
+    return "", fmt.Errorf("Sensor with name %s not found", name)
+}
+
+func (g *Gateway) ChangeActuatorState(name string, state string) (string, error) {
+    g.actuatorLock.RLock()
+    defer g.actuatorLock.RUnlock()
+
+    actuator, ok := g.actuators[name]
+
+    if !ok {
+        return "", fmt.Errorf("Actuator with name %s not found", name)
+    }
+
+    actuator.ChangeState(state)
+    return actuator.data, nil
 }
 
 func (g *Gateway) RemoveSensor(disconnectRequest *pb.DisconnectionRequest) error {
@@ -96,67 +128,71 @@ func (g *Gateway) RemoveActuator(disconnectRequest *pb.DisconnectionRequest) err
     return nil
 }
 
-
-func (g *Gateway) ListenDisconnections() error {
-	q, err := g.ch.QueueDeclare(
-		"disconnect", // name
-		false,     // durable
-		false,     // delete when unused
-		false,     // exclusive
-		false,     // no-wait
-		nil,       // arguments
-	)
-
-	if err != nil {
-		return err
-	}
-
-    connection, err := g.ch.Consume(
-		q.Name,    // queue
-		"",        // consumer
-		true,      // auto-ack
-		false,     // exclusive
-		false,     // no-local
-		false,     // no-wait
-		nil,       // args
-	)
-
-
-	slog.Info("Gateway is listening for device disconnections...")
-
-	for msg := range connection {
-		disconnectionRequest := &pb.DisconnectionRequest{}
-		err := proto.Unmarshal(msg.Body, disconnectionRequest)
-
-		if err != nil {
-			slog.Error(fmt.Sprintf("Error when err unmarshalling disconection request: %v", err))
-			continue
-		}
-
-        qname := disconnectionRequest.GetQueueName()
-
-		slog.Info(fmt.Sprintf("Received disconnection request: queue: %v", qname))
-
-        if _, ok := g.sensors[qname]; !ok {
-            slog.Info(fmt.Sprintf("Device with queue %s is not registered", qname))
-            continue
-        }
-       
-        id, err := uuid.Parse(disconnectionRequest.GetId())
-        if err != nil {
-            slog.Error(fmt.Sprintf("Error when parsing id: %v", err))
-            continue
-        }
-
-        if g.idType[id] == DeviceType(pb.DeviceType_DEVICE_TYPE_SENSOR) {
-            go g.RemoveSensor(disconnectionRequest)
-        } else if g.idType[id] == DeviceType(pb.DeviceType_DEVICE_TYPE_ACTUATOR) {
-            go g.RemoveActuator(disconnectionRequest)
-        }
-	}
-
-    return nil
-}
+// func (g *Gateway) HandleDisconnection(msg amqp.Delivery) {
+//     disconnectionRequest := &pb.DisconnectionRequest{}
+//     err := proto.Unmarshal(msg.Body, disconnectionRequest)
+//
+//     if err != nil {
+//         slog.Error(fmt.Sprintf("Error when err unmarshalling disconection request: %v", err))
+//         return
+//     }
+//
+//     qname := disconnectionRequest.GetQueueName()
+//
+//     slog.Info(fmt.Sprintf("Received disconnection request: queue: %v", qname))
+//
+//     if _, ok := g.sensors[qname]; !ok {
+//         slog.Info(fmt.Sprintf("Device with queue %s is not registered", qname))
+//         return
+//     }
+//
+//     id, err := uuid.Parse(disconnectionRequest.GetId())
+//     if err != nil {
+//         slog.Error(fmt.Sprintf("Error when parsing id: %v", err))
+//         return
+//     }
+//
+//     if g.idType[id] == DeviceType(pb.DeviceType_DEVICE_TYPE_ACTUATOR) {
+//         go g.RemoveActuator(disconnectionRequest)
+//     }
+// }
+//
+// func (g *Gateway) ListenDisconnections() error {
+// 	q, err := g.ch.QueueDeclare(
+// 		"disconnect", // name
+// 		false,     // durable
+// 		false,     // delete when unused
+// 		false,     // exclusive
+// 		false,     // no-wait
+// 		nil,       // arguments
+// 	)
+//
+// 	if err != nil {
+// 		return err
+// 	}
+//
+//     connection, err := g.ch.Consume(
+// 		q.Name,    // queue
+// 		"",        // consumer
+// 		true,      // auto-ack
+// 		false,     // exclusive
+// 		false,     // no-local
+// 		false,     // no-wait
+// 		nil,       // args
+// 	)
+//
+//
+// 	slog.Info("Gateway is listening for device disconnections...")
+//
+//     for {
+//         select {
+//             case <-g.close:
+//                 return nil
+//             case msg := <-connection:
+//                 go g.HandleDisconnection(msg)
+//         }
+//     }
+// }
 
 func (g *Gateway) AddSensor(device *Sensor) {
     g.sensorLock.Lock()
@@ -174,74 +210,170 @@ func (g *Gateway) AddActuator(device *Actuator) {
     g.idLock.Lock()
     defer g.idLock.Unlock()
     g.idType[device.id] = DeviceType(pb.DeviceType_DEVICE_TYPE_ACTUATOR)
+    slog.Info(fmt.Sprintf("Actuator registered with name: %s", device.name))
 }
 
-func (g *Gateway) ListenConnections() error {
-	q, err := g.ch.QueueDeclare(
-		"connect", // name
-		false,     // durable
-		false,     // delete when unused
-		false,     // exclusive
-		false,     // no-wait
-		nil,       // arguments
-	)
+func (g *Gateway) ListenActuatorRegistration() {
+    exchangeName := "actuator_registration_order_exchange"
+    ch, err := g.conn.Channel()
 
-	if err != nil {
-		return err
-	}
+    if err != nil {
+        slog.Error(fmt.Sprintf("Failed to open a channel: %v", err))
+    }
 
-    connection, err := g.ch.Consume(
-		q.Name,    // queue
-		"",        // consumer
-		true,      // auto-ack
-		false,     // exclusive
-		false,     // no-local
-		false,     // no-wait
-		nil,       // args
-	)
+    err = ch.ExchangeDeclare(
+        exchangeName, // name
+        "fanout",     // kind
+        false,        // durable
+        false,        // auto-delete
+        false,        // internal
+        false,        // no-wait
+        nil,          // arguments
+    )
 
+    if err != nil {
+        slog.Error(fmt.Sprintf("Failed to declare exchange: %v", err))
+        return
+    }
 
-	slog.Info("Gateway is listening for device connections...")
+    slog.Info("Sending registration order")
 
-	for msg := range connection {
-		connectionRequest := &pb.ConnectionRequest{}
-		err := proto.Unmarshal(msg.Body, connectionRequest)
+    err = ch.Publish(
+        exchangeName,
+        "",
+        false,
+        false,
+        amqp.Publishing{
+            ContentType: "text/plain",
+            Body: []byte(""),
+        },
+        )
 
-		if err != nil {
-			slog.Error(fmt.Sprintf("Error when err unmarshalling connection request: %v", err))
-			continue
-		}
+    if err != nil {
+        slog.Error(fmt.Sprintf("Failed to publish a message: %v", err))
+    }
 
-		slog.Info(fmt.Sprintf("Received connection request: queue: %v", connectionRequest.GetQueueName()))
+    queueName := "connect"
 
-        if v, ok := g.sensors[connectionRequest.GetQueueName()]; ok {
-            slog.Error(fmt.Sprintf("Device with queue %s already exists", connectionRequest.GetQueueName()))
-            slog.Error(fmt.Sprintf("Ok was: %v and v was %v", ok, v))
-            continue
+    q, err := ch.QueueDeclare(
+        queueName, // name
+        false,     // durable
+        false,     // delete when unused
+        false,     // exclusive
+        false,     // no-wait
+        nil,       // arguments
+        )
+
+    msgs, err := ch.Consume(
+        q.Name, // queue
+        "",     // consumer
+        true,   // auto-ack
+        false,  // exclusive
+        false,  // no-local
+        false,  // no-wait
+        nil,    // arguments
+        )
+
+    if err != nil {
+        slog.Error(fmt.Sprintf("Failed to consume a message: %v", err))
+        return
+    }
+
+    // Process messages in a goroutine
+    slog.Info("Gateway is listening for actuator registrations...")
+    for { 
+        select {
+            case <-g.close:
+                return
+            case msg := <-msgs:
+                go g.HandleActuatorRegistration(msg)
         }
+    }
+}
 
-        if connectionRequest.GetType() == pb.DeviceType_DEVICE_TYPE_SENSOR {
-            go func(){
-                sensor, err := sensorFromConnection(g.ch, connectionRequest)
+func (g *Gateway) HandleActuatorRegistration(msg amqp.Delivery) {
+    var connectionRequest pb.ConnectionRequest
+    proto.Unmarshal(msg.Body, &connectionRequest)
 
-                if err != nil {
-                    slog.Error(fmt.Sprintf("Error when creating device from connection: %v", err))
-                }
+    name := connectionRequest.GetQueueName()
 
-                go g.AddSensor(sensor)
-                go sensor.ListenUpdates()
-            }()
-        } else if connectionRequest.GetType() == pb.DeviceType_DEVICE_TYPE_ACTUATOR {
-            go func() {
-                actuator, err := actuatorFromConnection(g.ch, connectionRequest)
+    actuator, ok := g.actuators[name]
 
-                if err != nil {
-                    slog.Error(fmt.Sprintf("Error when creating device from connection: %v", err))
-                }
-                go g.AddActuator(actuator)
-            }()
+    if ok {
+        slog.Info(fmt.Sprintf("Actuator with name %s already exists, overriding it.", name))
+    }
+
+    actuator, err := newActuator(&connectionRequest)
+
+    if err != nil {
+        slog.Error(fmt.Sprintf("Failed to create actuator: %v", err))
+    }
+
+    g.AddActuator(actuator)
+}
+
+func (g *Gateway) ListenSensorUpdates() {
+    ch, err := g.conn.Channel()
+
+    if err != nil {
+        slog.Error(fmt.Sprintf("Failed to open a channel: %v", err))
+    }
+    slog.Info("Gateway is listening for sensor updates...")
+    queueName := "sensor_updates"
+
+    q, err := ch.QueueDeclare(
+        queueName, // name
+        false,     // durable
+        false,     // delete when unused
+        false,     // exclusive
+        false,     // no-wait
+        nil,       // arguments
+        )
+
+    msgs, err := ch.Consume(
+        q.Name, // queue
+        "",     // consumer
+        true,   // auto-ack
+        false,  // exclusive
+        false,  // no-local
+        false,  // no-wait
+        nil,    // arguments
+        )
+
+    if err != nil {
+        slog.Error(fmt.Sprintf("Failed to consume a message: %v", err))
+        return
+    }
+
+    // Process messages in a goroutine
+    for { 
+        select {
+            case <-g.close:
+                return
+            case msg := <-msgs:
+                slog.Info("Message arrived")
+                go g.HandleUpdate(msg)
         }
-	}
+    }
+}
 
-    return nil
+func (g *Gateway) HandleUpdate(msg amqp.Delivery) {
+    var sensorUpdate pb.SensorDataUpdate
+    proto.Unmarshal(msg.Body, &sensorUpdate)
+
+    name := sensorUpdate.GetName()
+
+    slog.Info(fmt.Sprintf("Received updates from %s", name))
+
+    sensor, ok := g.sensors[name]
+
+    if !ok {
+        g.AddSensor(&Sensor{
+            name:   name,
+            data:   sensorUpdate.GetData(),
+        })
+        return
+    }
+
+    sensor.SetData(sensorUpdate.GetData())
 }

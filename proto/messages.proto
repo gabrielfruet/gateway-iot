@@ -13,6 +13,8 @@ enum DeviceType {
 message ConnectionRequest {
     optional string queue_name = 1;
     optional DeviceType type = 2;
+    optional string ip = 3;
+    optional string port = 4;
 }
 
 message ConnectionResponse {
@@ -27,4 +29,5 @@ message DisconnectionRequest {
 message SensorDataUpdate {
     optional string data = 1;
     optional string id = 2;
+    optional string name = 3;
 }

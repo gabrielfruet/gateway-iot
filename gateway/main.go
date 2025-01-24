@@ -12,7 +12,8 @@ func main() {
 		log.Panic(err)
 	}
 
-    go gateway.ListenDisconnections()
     go httpServer.Start()
-	gateway.ListenConnections()
+    go gateway.ListenActuatorRegistration()
+    gateway.ListenSensorUpdates()
+    defer gateway.Close()
 }

@@ -2,3 +2,4 @@ pika
 protobuf
 grpcio-tools
 grpcio
+python-dotenv

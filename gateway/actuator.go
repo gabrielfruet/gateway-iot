@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	pb "gateway/proto"
+	"log/slog"
+	"sync"
 
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"google.golang.org/protobuf/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Actuator struct {
@@ -14,33 +18,52 @@ type Actuator struct {
     id uuid.UUID
     name string
     data string
+    dataLock sync.RWMutex
     disconnect chan struct{}
+    client pb.ActuatorClient 
 }
 
-func actuatorFromConnection(ch *amqp.Channel, sensor *pb.ConnectionRequest) (*Actuator, error) {
-    id := uuid.New()
+func (a* Actuator) ChangeState(state string) {
+    id := a.id.URN()
 
-    idURN := id.URN()
+    slog.Info("Sending gRPC call for changing the state of actuator %s to %s", a.name, state)
 
-    connectionResponse := pb.ConnectionResponse{
-        Id: &idURN,
+    r, err := a.client.ChangeState(
+        context.Background(),
+        &pb.ActuatorState{Id: &id, State: &state},
+        )
+
+    if err != nil {
+        slog.Error(fmt.Sprintf("RPC ChangeState: %s", err.Error()))
     }
 
-    connectionResponseBytes, err := proto.Marshal(&connectionResponse)
+    a.dataLock.Lock()
+    defer a.dataLock.Unlock()
+    a.data = r.GetState()
+}
 
-	if err != nil {
-		return nil, err
-	}
+func newActuator(actuator *pb.ConnectionRequest) (*Actuator, error) {
+    if actuator.GetIp() == "" && actuator.GetPort() == "" {
+        return nil, fmt.Errorf("%s: ip and port must be provided", actuator.GetQueueName())
+    }
 
-    ch.Publish("", fmt.Sprintf("%s_id", sensor.GetQueueName()), false, false, amqp.Publishing{
-        ContentType: "text/plain",
-        Body:        connectionResponseBytes,
-    })
+    conn, err := grpc.NewClient(
+        fmt.Sprintf("%s:%s", actuator.GetIp(), actuator.GetPort()),
+        grpc.WithTransportCredentials(insecure.NewCredentials()),
+        )
+
+    slog.Info(fmt.Sprintf("Connecting to %s:%s gRPC", actuator.GetIp(), actuator.GetPort()))
+
+    if err != nil {
+        return nil, err
+    }
+
+    client := pb.NewActuatorClient(conn)
 
     return &Actuator{
-        channel:     ch,
-        id:          id,
-        name:        sensor.GetQueueName(),
+        client:      client,
+        name:        actuator.GetQueueName(),
+        id:          uuid.New(),
         data:        "",
         disconnect:  make(chan struct{}),
     }, nil

@@ -5,6 +5,7 @@ import (
 	pb "gateway/proto"
 	"log"
 	"log/slog"
+	"sync"
 
 	uuid "github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -19,7 +20,20 @@ type Sensor struct {
 	id          uuid.UUID
     name        string
 	data        string
+    dataLock    sync.RWMutex
     disconnect  chan struct{}
+}
+
+func (s *Sensor) SetData(data string) {
+    s.dataLock.Lock()
+    defer s.dataLock.Unlock()
+    s.data = data
+}
+
+func (s *Sensor) GetData() string {
+    s.dataLock.RLock()
+    defer s.dataLock.RUnlock()
+    return s.data
 }
 
 func (s *Sensor) GetQueueDelivery() (<-chan amqp.Delivery, error) {
@@ -54,6 +68,11 @@ func (s *Sensor) GetQueueDelivery() (<-chan amqp.Delivery, error) {
     return delivery, nil
 }
 
+func (s *Sensor) Disconnect() {
+    slog.Info(fmt.Sprintf("Stopping %s from receiving updates\n", s.name))
+    close(s.disconnect)
+}
+
 func (s *Sensor) ListenUpdates() error {
     delivery, err := s.GetQueueDelivery()
 
@@ -81,9 +100,10 @@ func (s *Sensor) ListenUpdates() error {
 			}
 
 			slog.Info(fmt.Sprintf("Received update from %s; DATA=%s\n", s.name, sensor_data.GetData()))
+            s.SetData(sensor_data.GetData())
 
 		case <-s.disconnect:
-			slog.Info(fmt.Sprintf("Stopping %s from receiving updates\n", s.name))
+            s.Disconnect()
 			return nil
 		}
 	}
