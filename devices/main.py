@@ -42,19 +42,28 @@ class Device():
         self.data_lock: Lock = Lock()
 
     def start(self):
-        t1 = Thread(target=self._connect_actuator_to_gateway)
-        t2 = Thread(target=self.send_to_gateway)
+        t1 = Thread(target=self._connect_actuator_to_gateway, daemon=False)
+        t2 = Thread(target=self.send_to_gateway, daemon=False)
         t1.start()
         t2.start()
 
     def _connect_actuator_to_gateway(self):
         connection: pika.BlockingConnection = connect_to_broker() 
         channel = connection.channel()
+        temp_queue = channel.queue_declare('')
+
+        register_queue = 'connect'
+        channel.queue_declare(queue=register_queue)
+        registration_order_queue = temp_queue.method.queue
+
+        exchange_name = 'actuator_registration_order_exchange'
+        channel.exchange_declare(exchange=exchange_name, exchange_type='fanout')
+
+
+        channel.queue_bind(exchange=exchange_name, queue=registration_order_queue)
         try:
             while True:
                 logger.info("Registering actuator")
-                exchange_name = 'actuator_registration_order_exchange'
-                channel.exchange_declare(exchange=exchange_name, exchange_type='fanout')
 
                 cr = messages.ConnectionRequest(
                     queue_name=f'{self.name}',
@@ -64,15 +73,9 @@ class Device():
                     data=self.data
                 )
 
-                register_queue = 'connect'
-                channel.queue_declare(queue=register_queue)
                 channel.basic_publish(exchange='',
                                       routing_key=register_queue,
                                       body=cr.SerializeToString())
-
-                result = channel.queue_declare('')
-                registration_order_queue = result.method.queue
-                channel.queue_bind(exchange=exchange_name, queue=registration_order_queue)
 
                 for method_frame, props, body in channel.consume(registration_order_queue,  auto_ack=True):
                     logger.info("Registration order arrived")
@@ -121,17 +124,7 @@ class Device():
 
         return self.data
 
-
-def handle_signal(signum, frame):
-    print(f"Signal {signum} received, exiting gracefully.")
-    sys.exit(0)
-
-
 if __name__ == '__main__':
-    signals = [signal.SIGINT, signal.SIGTERM, signal.SIGHUP]
-    for sig in signals:
-        signal.signal(sig, handle_signal)
-
     if len(sys.argv) <= 3:
         print("Usage: python main.py <queue_name> <ip> <port>")
         sys.exit(1)
@@ -144,15 +137,9 @@ if __name__ == '__main__':
 
     device = Device(queue_name, ip, port, '10')
 
-    try:
-        device.start()
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        server.add_insecure_port(f"[::]:{port}")
-        services_grpc.add_ActuatorServicer_to_server(actuator.ActuatorServer(device), server)
-        server.start()
-        server.wait_for_termination()
-    except Exception as err:
-        logger.error(err)
-        pass
-    finally:
-        sys.exit(0)
+    device.start()
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    server.add_insecure_port(f"[::]:{port}")
+    services_grpc.add_ActuatorServicer_to_server(actuator.ActuatorServer(device), server)
+    server.start()
+    server.wait_for_termination()
