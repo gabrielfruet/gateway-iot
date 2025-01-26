@@ -92,8 +92,6 @@ func (g *Gateway) RemoveSensor(disconnectRequest *pb.DisconnectionRequest) error
         return err
     }
 
-    g.sensors[name].disconnect <- struct{}{}
-
     g.sensorLock.Lock()
     defer g.sensorLock.Unlock()
     slog.Debug(fmt.Sprintf("Deleting element from devices queue: %s", name))
@@ -126,71 +124,6 @@ func (g *Gateway) RemoveActuator(disconnectRequest *pb.DisconnectionRequest) err
     return nil
 }
 
-// func (g *Gateway) HandleDisconnection(msg amqp.Delivery) {
-//     disconnectionRequest := &pb.DisconnectionRequest{}
-//     err := proto.Unmarshal(msg.Body, disconnectionRequest)
-//
-//     if err != nil {
-//         slog.Error(fmt.Sprintf("Error when err unmarshalling disconection request: %v", err))
-//         return
-//     }
-//
-//     qname := disconnectionRequest.GetQueueName()
-//
-//     slog.Info(fmt.Sprintf("Received disconnection request: queue: %v", qname))
-//
-//     if _, ok := g.sensors[qname]; !ok {
-//         slog.Info(fmt.Sprintf("Device with queue %s is not registered", qname))
-//         return
-//     }
-//
-//     id, err := uuid.Parse(disconnectionRequest.GetId())
-//     if err != nil {
-//         slog.Error(fmt.Sprintf("Error when parsing id: %v", err))
-//         return
-//     }
-//
-//     if g.idType[id] == DeviceType(pb.DeviceType_DEVICE_TYPE_ACTUATOR) {
-//         go g.RemoveActuator(disconnectionRequest)
-//     }
-// }
-//
-// func (g *Gateway) ListenDisconnections() error {
-// 	q, err := g.ch.QueueDeclare(
-// 		"disconnect", // name
-// 		false,     // durable
-// 		false,     // delete when unused
-// 		false,     // exclusive
-// 		false,     // no-wait
-// 		nil,       // arguments
-// 	)
-//
-// 	if err != nil {
-// 		return err
-// 	}
-//
-//     connection, err := g.ch.Consume(
-// 		q.Name,    // queue
-// 		"",        // consumer
-// 		true,      // auto-ack
-// 		false,     // exclusive
-// 		false,     // no-local
-// 		false,     // no-wait
-// 		nil,       // args
-// 	)
-//
-//
-// 	slog.Info("Gateway is listening for device disconnections...")
-//
-//     for {
-//         select {
-//             case <-g.close:
-//                 return nil
-//             case msg := <-connection:
-//                 go g.HandleDisconnection(msg)
-//         }
-//     }
-// }
 
 func (g *Gateway) AddSensor(device *Sensor) {
     g.sensorLock.Lock()
