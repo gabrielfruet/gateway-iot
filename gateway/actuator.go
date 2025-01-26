@@ -8,18 +8,15 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Actuator struct {
-    channel *amqp.Channel
     id uuid.UUID
     name string
     data string
     dataLock sync.RWMutex
-    disconnect chan struct{}
     client pb.ActuatorClient 
 }
 
@@ -64,7 +61,6 @@ func newActuator(actuator *pb.ConnectionRequest) (*Actuator, error) {
         client:      client,
         name:        actuator.GetQueueName(),
         id:          uuid.New(),
-        data:        "",
-        disconnect:  make(chan struct{}),
+        data:        actuator.GetData(),
     }, nil
 }

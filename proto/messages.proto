@@ -15,6 +15,7 @@ message ConnectionRequest {
     optional DeviceType type = 2;
     optional string ip = 3;
     optional string port = 4;
+    optional string data = 5;
 }
 
 message ConnectionResponse {

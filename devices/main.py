@@ -32,13 +32,13 @@ def connect_to_broker() -> pika.BlockingConnection:
     return connection
 
 class Device():
-    def __init__(self, name: str, ip: str, port: str, data: int):
+    def __init__(self, name: str, ip: str, port: str, data: str):
         self.sensor_id: str = str(uuid.uuid4())
         self.actuator_id: str = ""
         self.port = port
         self.ip = ip
         self.name = name
-        self.data: int = data
+        self.data: str = data
         self.data_lock: Lock = Lock()
 
     def start(self):
@@ -56,7 +56,13 @@ class Device():
                 exchange_name = 'actuator_registration_order_exchange'
                 channel.exchange_declare(exchange=exchange_name, exchange_type='fanout')
 
-                cr = messages.ConnectionRequest(queue_name=f'{self.name}', type=messages.DEVICE_TYPE_ACTUATOR, ip=self.ip, port=self.port)
+                cr = messages.ConnectionRequest(
+                    queue_name=f'{self.name}',
+                    type=messages.DEVICE_TYPE_ACTUATOR,
+                    ip=self.ip,
+                    port=self.port,
+                    data=self.data
+                )
 
                 register_queue = 'connect'
                 channel.queue_declare(queue=register_queue)
@@ -108,9 +114,9 @@ class Device():
         finally:
             channel.close()
 
-    def change_data(self, request: services.ActuatorState) -> int | None:
+    def change_data(self, request: services.ActuatorState) -> str | None:
         self.data_lock.acquire()
-        self.data = int(request.state)
+        self.data = request.state
         self.data_lock.release()
 
         return self.data
@@ -136,7 +142,7 @@ if __name__ == '__main__':
 
     logger = logging.LoggerAdapter(logger, {"app_name":queue_name})
 
-    device = Device(queue_name, ip, port, 10)
+    device = Device(queue_name, ip, port, '10')
 
     try:
         device.start()

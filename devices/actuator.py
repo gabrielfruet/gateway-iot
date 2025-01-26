@@ -20,4 +20,4 @@ class ActuatorServer(services_grpc.ActuatorServicer):
             context.set_details("ID does not match")
             return services.ActuatorState(id=self.device.sensor_id, state="0")
 
-        return services.ActuatorState(id=self.device.sensor_id, state=str(data))
+        return services.ActuatorState(id=self.device.sensor_id, state=data)

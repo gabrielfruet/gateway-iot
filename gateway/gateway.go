@@ -114,8 +114,6 @@ func (g *Gateway) RemoveActuator(disconnectRequest *pb.DisconnectionRequest) err
         return err
     }
 
-    g.actuators[name].disconnect <- struct{}{}
-
     g.actuatorLock.Lock()
     defer g.actuatorLock.Unlock()
     slog.Debug(fmt.Sprintf("Deleting element from devices queue: %s", name))
