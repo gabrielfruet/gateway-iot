@@ -2,3 +2,4 @@
 */proto
 !./proto/**
 __pycache__
+.env
