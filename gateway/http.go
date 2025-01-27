@@ -63,9 +63,9 @@ func (h *HttpServer) GetSensorData(name string, w http.ResponseWriter) http.Resp
 
 func (h *HttpServer) ChangeActuatorState(w http.ResponseWriter, r *http.Request) http.ResponseWriter {
     var changeStatePayload ChangeStatePayload
-    slog.Info("Changing actuator state")
+    slog.Info("Sending request to change Actuator State")
     err := json.NewDecoder(r.Body).Decode(&changeStatePayload)
-    slog.Info(fmt.Sprintf("%v",changeStatePayload))
+    slog.Info(fmt.Sprintf("payload: %v",changeStatePayload))
 
     if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)

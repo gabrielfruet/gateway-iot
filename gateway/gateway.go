@@ -77,7 +77,9 @@ func (g *Gateway) ChangeActuatorState(name string, state string) (string, error)
     actuator, ok := g.actuators[name]
 
     if !ok {
-        return "", fmt.Errorf("Actuator with name %s not found", name)
+        err := fmt.Errorf("Actuator with name %s not found", name)
+        slog.Error(err.Error())
+        return "", err
     }
 
     actuator.ChangeState(state)
