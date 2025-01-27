@@ -6,6 +6,7 @@ import actuator
 import uuid
 from concurrent import futures
 from threading import Thread, Lock, Event
+from handlers import DataHandler
 import pika.connection
 import grpc
 import sys
@@ -16,11 +17,12 @@ import signal
 
 logger = logging.getLogger(__name__)
 syslog = logging.StreamHandler()
-formatter = logging.Formatter('%(levelname)s %(asctime)s %(app_name)s: %(message)s')
+formatter = logging.Formatter('%(levelname)s %(asctime)s: %(message)s')
 syslog.setFormatter(formatter)
-logger.setLevel(logging.INFO)
-logger.handlers.clear()
-logger.addHandler(syslog)
+
+logging.basicConfig(handlers=[syslog], level=logging.INFO)
+# logger.handlers.clear()
+# logger.addHandler(syslog)
 
 broker_connect = Lock()
 
@@ -38,7 +40,7 @@ class Device():
         self.port = port
         self.ip = ip
         self.name = name
-        self.data: str = data
+        self.data: DataHandler = DataHandler.get_handler(name)()
         self.data_lock: Lock = Lock()
 
     def start(self):
@@ -70,7 +72,7 @@ class Device():
                     type=messages.DEVICE_TYPE_ACTUATOR,
                     ip=self.ip,
                     port=self.port,
-                    data=self.data
+                    data=self.data.get_data()
                 )
 
                 channel.basic_publish(exchange='',
@@ -95,7 +97,7 @@ class Device():
         try:
             while True:
                 sdu = messages.SensorDataUpdate(
-                    data=str(self.data),
+                    data=self.data.get_data(),
                     id=self.sensor_id,
                     name=self.name,
                 )
@@ -119,10 +121,10 @@ class Device():
 
     def change_data(self, request: services.ActuatorState) -> str | None:
         self.data_lock.acquire()
-        self.data = request.state
+        self.data.set_state(request.state)
         self.data_lock.release()
 
-        return self.data
+        return self.data.get_data()
 
 if __name__ == '__main__':
     if len(sys.argv) <= 3:
@@ -132,8 +134,6 @@ if __name__ == '__main__':
     queue_name = sys.argv[1]
     ip = sys.argv[2]
     port = sys.argv[3]
-
-    logger = logging.LoggerAdapter(logger, {"app_name":queue_name})
 
     device = Device(queue_name, ip, port, '10')
 
