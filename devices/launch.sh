@@ -1,7 +1,5 @@
 #!/bin/sh
 
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-
-python "$SCRIPT_DIR/main.py" arcondicionado-1 &
-python "$SCRIPT_DIR/main.py" arcondicionado-2 & 
-python "$SCRIPT_DIR/main.py" arcondicionado-3 &
+python "./main.py" arconditioner-1 localhost 4999 &
+python "./main.py" arconditioner-2 localhost 4998 & 
+python "./main.py" arconditioner-3 localhost 4997 &

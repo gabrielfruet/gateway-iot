@@ -25,7 +25,7 @@ type Gateway struct {
 }
 
 func getConnection() (*amqp.Connection, error) {
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	conn, err := amqp.Dial("amqp://guest:guest@rabbitmq:5672/")
 
 	if err != nil {
 		return nil, err
@@ -66,6 +66,15 @@ func (g *Gateway) GetSensorData(name string) (string, error) {
     defer g.sensorLock.RUnlock()
     if sensor, ok := g.sensors[name]; ok {
         return sensor.data, nil
+    }
+    return "", fmt.Errorf("Sensor with name %s not found", name)
+}
+
+func (g *Gateway) GetActuatorData(name string) (string, error) {
+    g.actuatorLock.RLock()
+    defer g.actuatorLock.RUnlock()
+    if actuator, ok := g.actuators[name]; ok {
+        return actuator.data, nil
     }
     return "", fmt.Errorf("Sensor with name %s not found", name)
 }

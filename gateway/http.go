@@ -16,28 +16,48 @@ type HttpServer struct {
 func (h *HttpServer) GetActuators(w http.ResponseWriter) http.ResponseWriter {
     actuatorsNames := h.gateway.GetActuators()
     log.Printf("Actuators: %v", actuatorsNames)
-    b, err := json.Marshal(actuatorsNames)
+    response_body, err := json.Marshal(actuatorsNames)
 
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return w
     }
 
-    w.Write(b)
+    w.Write(response_body)
+    return w
+}
+
+func (h *HttpServer) GetActuatorData(name string, w http.ResponseWriter) http.ResponseWriter {
+    actuatorData, err := h.gateway.GetActuatorData(name)
+
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusNotFound)
+        return w
+    }
+
+    log.Printf("Actuator data: %v", actuatorData)
+    response_body, err := json.Marshal(actuatorData)
+
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return w
+    }
+
+    w.Write(response_body)
     return w
 }
 
 func (h *HttpServer) GetSensors(w http.ResponseWriter) http.ResponseWriter {
     sensorsNames := h.gateway.GetSensors()
     log.Printf("Sensors: %v", sensorsNames)
-    b, err := json.Marshal(sensorsNames)
+    response_body, err := json.Marshal(sensorsNames)
 
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return w
     }
 
-    w.Write(b)
+    w.Write(response_body)
     return w
 }
 
@@ -50,14 +70,14 @@ func (h *HttpServer) GetSensorData(name string, w http.ResponseWriter) http.Resp
     }
 
     log.Printf("Sensors data: %v", sensorData)
-    b, err := json.Marshal(sensorData)
+    response_body, err := json.Marshal(sensorData)
 
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return w
     }
 
-    w.Write(b)
+    w.Write(response_body)
     return w
 }
 
@@ -71,7 +91,23 @@ func (h *HttpServer) ChangeActuatorState(w http.ResponseWriter, r *http.Request)
         http.Error(w, err.Error(), http.StatusBadRequest)
         return w
     }
-    h.gateway.ChangeActuatorState(changeStatePayload.Name, changeStatePayload.State)
+    data, err := h.gateway.ChangeActuatorState(changeStatePayload.Name, changeStatePayload.State)
+
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return w
+    }
+
+    changeStatePayload.State = data
+
+    response_body, err := json.Marshal(changeStatePayload)
+
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return w
+    }
+
+    w.Write(response_body)
     return w
 }
 
@@ -82,8 +118,11 @@ type ChangeStatePayload struct {
 
 func (h *HttpServer) actuatorsHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
+    name := r.URL.Query().Get("name")
     if r.Method == http.MethodGet {
         h.GetActuators(w)
+    } else if r.Method == http.MethodGet && name != "" {
+        h.GetActuatorData(name, w)
     } else if r.Method == http.MethodPost {
         h.ChangeActuatorState(w,r)
     }
