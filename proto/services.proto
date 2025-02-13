@@ -1,7 +1,6 @@
 syntax = "proto2";
 package tutorial;
 
-import "google/protobuf/timestamp.proto";
 
 option go_package = "gateway/proto";
 
