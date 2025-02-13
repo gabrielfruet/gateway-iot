@@ -28,4 +28,5 @@ class ArconditionerDataHandler(DataHandler):
             case "OFF":
                 return str(self.data_off + random.uniform(-2,2))
 
+print('Ive been called')
 DataHandler.register('arconditioner', ArconditionerDataHandler)
