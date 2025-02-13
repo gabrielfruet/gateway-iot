@@ -33,7 +33,7 @@ func getConnection() (*amqp.Connection, error) {
     return conn, nil
 }
 
-func newGateway() (*Gateway, error) {
+func NewGateway() (*Gateway, error) {
     conn, err := getConnection()
 
     if err != nil {

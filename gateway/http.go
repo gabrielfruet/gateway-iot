@@ -144,7 +144,7 @@ func (h *HttpServer) Start() {
     h.server.ListenAndServe()
 }
 
-func newHttpServer(gateway *Gateway) *HttpServer {
+func NewHttpServer(gateway *Gateway) *HttpServer {
     server := &http.Server{
         Addr: ":8080",
     }

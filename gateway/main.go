@@ -5,8 +5,8 @@ import (
 )
 
 func main() {
-	gateway, err := newGateway()
-    httpServer := newHttpServer(gateway)
+	gateway, err := NewGateway()
+    httpServer := NewHttpServer(gateway)
 
 	if err != nil {
 		log.Panic(err)
