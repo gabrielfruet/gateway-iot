@@ -29,7 +29,7 @@ broker_connect = Lock()
 def connect_to_broker() -> pika.BlockingConnection:
     global broker_connect
     broker_connect.acquire()
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
     broker_connect.release()
     return connection
 
