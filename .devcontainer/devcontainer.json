@@ -1,0 +1,10 @@
+{
+    "name": "Gateway iot development container",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "image": "gateway-iot:latest",
+    "containerUser": "gateway",
+    "runArgs": ["-w", "/workspaces/gateway-iot"]
+}
+
