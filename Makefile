@@ -24,7 +24,6 @@ $(GO_DST)/proto: $(PROTO_FILES)
 		--go-grpc_opt=paths=source_relative --go-grpc_out=$(GO_DST) $(PROTO_FILES)
 
 $(PY_DST)/proto: $(PROTO_FILES)
-	# protoc -I=. --python_out=$(PY_DST) --pyi_out=$(PY_DST) --grpc_python_out=$(PY_DST) $(PROTO_FILES)
 	python -m grpc_tools.protoc -I=. --python_out=$(PY_DST) --pyi_out=$(PY_DST)  --grpc_python_out=$(PY_DST) $(PROTO_FILES)
 
 .PHONY: rabbitmq
@@ -38,7 +37,8 @@ gateway:
 		docker run -it --rm	--name gateway-iot \
 			-p 8080:8080 \
 			--network gateway-iot \
-			gateway-iot;
+			gateway-iot \
+			./gateway;
 
 .PHONY: devices
 devices:
@@ -46,7 +46,7 @@ devices:
 		docker run -it --rm	--name devices-iot \
 			--network gateway-iot \
 			devices-iot \
-			/bin/bash ./launch.sh
+			/bin/bash
 
 
 
