@@ -5,6 +5,6 @@
     },
     "image": "gateway-iot:latest",
     "containerUser": "gateway",
-    "runArgs": ["-w", "${containerWorkspaceFolder}", "--network", "gateway-iot"]
+    "runArgs": ["-w", "${containerWorkspaceFolder}", "--network", "gateway-iot", "-p", "8080"]
 }
 
