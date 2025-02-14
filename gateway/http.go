@@ -119,9 +119,9 @@ type ChangeStatePayload struct {
 func (h *HttpServer) actuatorsHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
     name := r.URL.Query().Get("name")
-    if r.Method == http.MethodGet {
+    if r.Method == http.MethodGet && name == "" {
         h.GetActuators(w)
-    } else if r.Method == http.MethodGet && name != "" {
+    } else if r.Method == http.MethodGet {
         h.GetActuatorData(name, w)
     } else if r.Method == http.MethodPost {
         h.ChangeActuatorState(w,r)
