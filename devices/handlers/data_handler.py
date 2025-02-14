@@ -12,7 +12,7 @@ class DataHandler(ABC):
     def get_handler(name: str) -> Type[DataHandler]:
         logger.info(f'Searching for {name} DataHandler')
         for k,v in registered_data_handlers.items():
-            if name in k:
+            if k in name:
                 return v
 
         raise RuntimeError("Data Handler not found")
