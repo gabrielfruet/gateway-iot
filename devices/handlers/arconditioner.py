@@ -2,7 +2,6 @@ from typing import Literal
 from .data_handler import DataHandler
 import random
 
-
 class ArconditionerDataHandler(DataHandler):
     def __init__(self):
         self.state: Literal["ON", "OFF"] = "OFF"

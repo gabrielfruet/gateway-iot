@@ -1,2 +1,3 @@
 from handlers.data_handler import DataHandler
+from handlers.others import LightDataHandler, TemperatureSensorDataHandler, DoorLockDataHandler
 from handlers.arconditioner import ArconditionerDataHandler
