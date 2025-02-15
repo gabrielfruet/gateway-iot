@@ -17,31 +17,50 @@ make rabbitmq
 ```
 ### Running the Gateway
 
-At the root of the project, do:
-
 ```bash
-cd gateway; go run .
+make gateway
 ```
 
 ### Running the Device
 
 ```bash
-python devices/main.py <device_name> <ip> <grpc_port>
+make devices
 ```
 
-The `device_name` has to have a DataHandler registered for it.
+On `devices/launch.sh`, you can configure the devices that will be launched
 
-Here’s a concise REST API description for the provided code in Markdown format:
+```bash
+...
+
+devices=(
+    "arconditioner-1" 
+    "arconditioner-2" 
+    "arconditioner-3" 
+    "light-1" 
+    "temperature_sensor-2" 
+    "door_lock-3"
+    ... add more data handlers/devices
+)
+
+...
+```
+
 
 # REST API Description
 
-## 1. Get Actuators
+## Get Actuators
 - **Route**: `/actuators`
 - **Verb**: `GET`
 - **Description**: Retrieves a list of all actuators.
 - **Response**: JSON array of actuator names.
 
-## 2. Change Actuator State
+## Get Actuators State
+- **Route**: `/actuators?name=<actuator_name>`
+- **Verb**: `GET`
+- **Description**: Retrieves the actuator state.
+- **Response**: String of actuator state.
+
+## Change Actuator State
 - **Route**: `/actuators`
 - **Verb**: `POST`
 - **Description**: Changes the state of a specific actuator.
@@ -54,20 +73,16 @@ Here’s a concise REST API description for the provided code in Markdown format
   ```
 - **Response**: No content.
 
-## 3. Get Sensors
+## Get Sensors
 - **Route**: `/sensors`
 - **Verb**: `GET`
 - **Description**: Retrieves a list of all sensors.
 - **Response**: JSON array of sensor names.
 
-## 4. Get Sensor Data
+## Get Sensor Data
 - **Route**: `/sensors?name=<sensor_name>`
 - **Verb**: `GET`
 - **Description**: Retrieves data for a specific sensor.
 - **Query Parameter**:
   - `name`: Name of the sensor.
 - **Response**: JSON object containing sensor data.
-
-## Notes
-- All responses are in JSON format.
-- Errors return appropriate HTTP status codes with error messages.
