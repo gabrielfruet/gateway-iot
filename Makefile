@@ -46,7 +46,7 @@ devices:
 		docker run -it --rm	--name devices-iot \
 			--network gateway-iot \
 			devices-iot \
-			/bin/bash
+			./launch.sh	
 
 
 
