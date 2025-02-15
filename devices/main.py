@@ -1,3 +1,4 @@
+import argparse
 import pika
 import proto.messages_pb2 as messages
 import proto.services_pb2 as services
@@ -127,19 +128,17 @@ class Device():
         return self.data.get_data()
 
 if __name__ == '__main__':
-    if len(sys.argv) <= 3:
-        print("Usage: python main.py <queue_name> <ip> <port>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Start the actuator gRPC server.")
+    parser.add_argument("queue_name", type=str, help="Name of the queue")
+    parser.add_argument("ip", type=str, help="IP address")
+    parser.add_argument("port", type=int, help="Port number")
+    args = parser.parse_args()
 
-    queue_name = sys.argv[1]
-    ip = sys.argv[2]
-    port = sys.argv[3]
-
-    device = Device(queue_name, ip, port, '10')
+    device = Device(args.queue_name, args.ip, args.port, '10')
 
     device.start()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    server.add_insecure_port(f"[::]:{port}")
+    server.add_insecure_port(f"[::]:{args.port}")
     services_grpc.add_ActuatorServicer_to_server(actuator.ActuatorServer(device), server)
     server.start()
     server.wait_for_termination()
