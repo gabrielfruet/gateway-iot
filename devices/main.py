@@ -51,7 +51,7 @@ class Device():
         t2.start()
 
     def _connect_actuator_to_gateway(self):
-        connection: pika.BlockingConnection = connect_to_broker() 
+        connection: pika.BlockingConnection = connect_to_broker()
         channel = connection.channel()
         temp_queue = channel.queue_declare('')
 
@@ -71,9 +71,9 @@ class Device():
                 cr = messages.ConnectionRequest(
                     queue_name=f'{self.name}',
                     type=messages.DEVICE_TYPE_ACTUATOR,
-                    ip=self.ip,
-                    port=self.port,
-                    data=self.data.get_data()
+                    ip=str(self.ip),
+                    port=str(self.port),
+                    data=str(self.data.get_data())
                 )
 
                 channel.basic_publish(exchange='',
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Start the actuator gRPC server.")
     parser.add_argument("queue_name", type=str, help="Name of the queue")
     parser.add_argument("ip", type=str, help="IP address")
-    parser.add_argument("port", type=int, help="Port number")
+    parser.add_argument("port", type=str, help="Port number")
     args = parser.parse_args()
 
     device = Device(args.queue_name, args.ip, args.port, '10')
