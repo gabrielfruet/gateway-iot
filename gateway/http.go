@@ -138,9 +138,28 @@ func (h *HttpServer) sensorsHandler(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+func corsMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Access-Control-Allow-Origin", "*")
+        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+        if r.Method == http.MethodOptions {
+            w.WriteHeader(http.StatusNoContent)
+            return
+        }
+
+        next.ServeHTTP(w, r)
+    })
+}
+
 func (h *HttpServer) Start() {
+    mux := http.NewServeMux()
     http.HandleFunc("/sensors", h.sensorsHandler)
     http.HandleFunc("/actuators", h.actuatorsHandler)
+
+    handler := corsMiddleware(mux)
+    h.server.Handler = handler
     h.server.ListenAndServe()
 }
 
