@@ -155,8 +155,8 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 func (h *HttpServer) Start() {
     mux := http.NewServeMux()
-    http.HandleFunc("/sensors", h.sensorsHandler)
-    http.HandleFunc("/actuators", h.actuatorsHandler)
+    mux.HandleFunc("/sensors", h.sensorsHandler)
+    mux.HandleFunc("/actuators", h.actuatorsHandler)
 
     handler := corsMiddleware(mux)
     h.server.Handler = handler
