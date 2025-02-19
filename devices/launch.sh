@@ -7,6 +7,7 @@ devices=(
     "light-1" 
     "temperature_sensor-2" 
     "door_lock-3"
+    "car_loc-1"
 )
 
 base_port=5123
