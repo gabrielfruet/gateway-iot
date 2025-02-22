@@ -50,4 +50,10 @@ devices:
 
 
 
-
+.PHONY: devices_bash
+devices_bash:
+	docker build -t devices-iot -f devices/Dockerfile . && \
+		docker run -it --rm	--name devices-iot \
+			--network gateway-iot \
+			devices-iot \
+			/bin/bash
